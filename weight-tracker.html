@@ -428,6 +428,7 @@
         <!-- ファイル操作ボタン -->
         <div style="text-align: center; margin-bottom: 20px;">
             <button class="btn" onclick="loadDataFromFile()" style="margin: 0 5px;">📂 ファイルを開く</button>
+            <button class="btn" onclick="addDataFromFile()" style="margin: 0 5px;">➕ ファイルを追加</button>
             <button class="btn" onclick="saveDataToFile()" style="margin: 0 5px;">💾 保存</button>
             <button class="btn" onclick="createNewFile()" style="margin: 0 5px;">📄 新規作成</button>
         </div>
@@ -703,6 +704,82 @@
             
             updateDisplay();
             alert('新規データを作成しました。データを入力後、必ず「💾 保存」ボタンでファイルを保存してください。');
+        }
+
+        // ファイルからデータを追加（統合）
+        async function addDataFromFile() {
+            try {
+                const input = document.createElement('input');
+                input.type = 'file';
+                input.accept = '.json';
+                input.multiple = true; // 複数ファイル選択可能
+                
+                return new Promise((resolve) => {
+                    input.onchange = async (e) => {
+                        const files = e.target.files;
+                        if (!files || files.length === 0) {
+                            resolve(false);
+                            return;
+                        }
+                        
+                        let addedCount = 0;
+                        let duplicateCount = 0;
+                        
+                        // 既存のIDセットを作成（重複チェック用）
+                        const existingIds = new Set(records.map(r => r.id));
+                        
+                        for (const file of files) {
+                            try {
+                                const text = await file.text();
+                                const data = JSON.parse(text);
+                                
+                                if (data.records && Array.isArray(data.records)) {
+                                    // 新しいレコードを追加（重複除外）
+                                    for (const record of data.records) {
+                                        // 備考フィールドがない場合は追加
+                                        const normalizedRecord = {...record, memo: record.memo || ''};
+                                        
+                                        if (!existingIds.has(normalizedRecord.id)) {
+                                            records.push(normalizedRecord);
+                                            existingIds.add(normalizedRecord.id);
+                                            addedCount++;
+                                        } else {
+                                            duplicateCount++;
+                                        }
+                                    }
+                                }
+                                
+                                // 設定は最初のファイルのものを使用（既に設定がない場合のみ）
+                                if (data.settings && !settings.height) {
+                                    settings = data.settings;
+                                }
+                            } catch (error) {
+                                console.error('ファイル読み込みエラー:', file.name, error);
+                            }
+                        }
+                        
+                        // 日付順にソート
+                        records.sort((a, b) => new Date(b.date) - new Date(a.date));
+                        
+                        updateDisplay();
+                        
+                        let message = `${addedCount}件のデータを追加しました！🧸`;
+                        if (duplicateCount > 0) {
+                            message += `\n（${duplicateCount}件の重複データはスキップしました）`;
+                        }
+                        message += '\n\n必ず「💾 保存」ボタンで統合後のデータを保存してください。';
+                        
+                        alert(message);
+                        resolve(true);
+                    };
+                    
+                    input.click();
+                });
+            } catch (error) {
+                console.error('データ追加エラー:', error);
+                alert('データの追加に失敗しました');
+                return false;
+            }
         }
 
 
